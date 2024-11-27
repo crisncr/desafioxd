@@ -7,6 +7,7 @@ import { LoginUserDto } from './dto/login-user.dto';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid'; // Para generar tokens únicos
+import { ConfigService } from '@nestjs/config'; // Importar ConfigService para leer variables de entorno
 
 @Injectable()
 export class UsersService {
@@ -21,6 +22,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>, // Repositorio inyectado
+    private configService: ConfigService, // Inyectar ConfigService
   ) {}
 
   async create(createUserDto: CreateUserDto) {
@@ -55,7 +57,8 @@ export class UsersService {
 
     const savedUser = await this.usersRepository.save(user);
 
-    const activationLink = `http://localhost:3000/users/activate?email=${email}`;
+    const baseUrl = this.configService.get<string>('BASE_URL'); // Obtener BASE_URL del entorno
+    const activationLink = `${baseUrl}/users/activate?email=${email}`;
     await this.sendActivationEmail(email, activationLink);
 
     return {
@@ -125,7 +128,8 @@ export class UsersService {
     user.resetToken = resetToken;
     await this.usersRepository.save(user);
 
-    const resetLink = `http://localhost:3000/users/reset-password?token=${resetToken}`;
+    const baseUrl = this.configService.get<string>('BASE_URL'); // Obtener BASE_URL del entorno
+    const resetLink = `${baseUrl}/users/reset-password?token=${resetToken}`;
     await this.sendPasswordResetEmail(email, resetLink);
 
     return { message: 'Te hemos enviado un correo con un enlace para restablecer tu contraseña.' };
@@ -207,7 +211,6 @@ export class UsersService {
         <p>¡Hola!</p>
         <p>Tu cuenta ha sido bloqueada tras múltiples intentos fallidos.</p>
         <p>En iniciar sesion podras recuperarla</p>
-        
       `,
     };
 
