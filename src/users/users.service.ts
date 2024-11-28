@@ -210,7 +210,7 @@ export class UsersService {
       html: `
         <p>¡Hola!</p>
         <p>Tu cuenta ha sido bloqueada tras múltiples intentos fallidos.</p>
-        <p>En iniciar sesion podras recuperarla</p>
+        <p>En iniciar sesión podrás recuperarla</p>
       `,
     };
 
