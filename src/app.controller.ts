@@ -1,4 +1,4 @@
-import { Controller, Get, Render, Query, Post, Body, Redirect, Res, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Render, Query, Post, Body, Redirect, Res } from '@nestjs/common';
 import { UsersService } from './users/users.service';
 import { CreateUserDto } from './users/dto/create-user.dto';
 import { LoginUserDto } from './users/dto/login-user.dto';
@@ -75,51 +75,9 @@ export class AppController {
   }
 
   @Post('users/reset-password')
-  async resetPassword(
-    @Body() body: { newPassword: string },
-    @Query('token') token: string,
-    @Res() res: Response,
-  ) {
+  async resetPassword(@Body() body: { newPassword: string }, @Query('token') token: string) {
     const { newPassword } = body;
-
-    try {
-      // Validación: Contraseña debe cumplir requisitos y ser diferente
-      const isPasswordValid = /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword);
-      if (!isPasswordValid) {
-        throw new HttpException(
-          'La contraseña debe contener al menos una letra mayúscula, un número y ser de mínimo 8 caracteres.',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      // Buscar al usuario por el token de recuperación
-      const user = await this.usersService.findByResetToken(token);
-      if (!user) {
-        throw new HttpException(
-          'Token de recuperación inválido o expirado.',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      // Lógica para asegurar que la contraseña es diferente
-      const isPasswordDifferent = await this.usersService.isPasswordDifferent(user, newPassword);
-      if (!isPasswordDifferent) {
-        throw new HttpException(
-          'La nueva contraseña no puede ser igual a la anterior.',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      // Restablecer la contraseña
-      await this.usersService.resetPassword(token, newPassword);
-
-      return res.redirect('/login?successMessage=Contraseña restablecida con éxito');
-    } catch (error) {
-      return res.redirect(
-        `/users/reset-password?token=${encodeURIComponent(token)}&errorMessage=${encodeURIComponent(
-          error.message,
-        )}`,
-      );
-    }
+    await this.usersService.resetPassword(token, newPassword);
+    return { message: 'Contraseña restablecida con éxito' };
   }
 }

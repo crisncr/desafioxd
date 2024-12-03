@@ -6,35 +6,24 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
-import { v4 as uuidv4 } from 'uuid';
-import { ConfigService } from '@nestjs/config';
+import { v4 as uuidv4 } from 'uuid'; // Para generar tokens únicos
+import { ConfigService } from '@nestjs/config'; // Importar ConfigService para leer variables de entorno
 
 @Injectable()
 export class UsersService {
   private transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: 'axenoider20@gmail.com',
-      pass: 'jmniqqdmxyzrlcla',
+      user: 'axenoider20@gmail.com', // Tu correo de Gmail
+      pass: 'jmniqqdmxyzrlcla', // Tu contraseña de aplicación
     },
   });
 
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    private configService: ConfigService,
+    private usersRepository: Repository<User>, // Repositorio inyectado
+    private configService: ConfigService, // Inyectar ConfigService
   ) {}
-
-  // Método para activar la cuenta
-  async activateAccount(email: string): Promise<void> {
-    const user = await this.findByEmail(email);
-    if (!user) {
-      throw new Error('Usuario no encontrado.');
-    }
-
-    user.isActive = true;
-    await this.usersRepository.save(user);
-  }
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, firstName, lastName } = createUserDto;
@@ -61,14 +50,14 @@ export class UsersService {
       firstName,
       lastName,
       password: hashedPassword,
-      isActive: false,
-      loginAttempts: 0,
-      isLocked: false,
+      isActive: false, // Nuevo campo para la activación
+      loginAttempts: 0, // Inicializamos los intentos fallidos
+      isLocked: false, // Inicializamos el estado de bloqueo
     });
 
     const savedUser = await this.usersRepository.save(user);
 
-    const baseUrl = this.configService.get<string>('BASE_URL');
+    const baseUrl = this.configService.get<string>('BASE_URL'); // Obtener BASE_URL del entorno
     const activationLink = `${baseUrl}/users/activate?email=${email}`;
     await this.sendActivationEmail(email, activationLink);
 
@@ -102,7 +91,7 @@ export class UsersService {
         user.isLocked = true;
         await this.usersRepository.save(user);
 
-        await this.sendAccountLockedEmail(user.email);
+        await this.sendAccountLockedEmail(email);
         throw new Error('La cuenta ha sido bloqueada tras 3 intentos fallidos.');
       }
 
@@ -116,6 +105,18 @@ export class UsersService {
     return { message: 'Login exitoso', user };
   }
 
+  async activateAccount(email: string) {
+    const user = await this.findByEmail(email);
+    if (!user) {
+      throw new Error('Usuario no encontrado.');
+    }
+
+    user.isActive = true;
+    await this.usersRepository.save(user);
+
+    return { message: 'Cuenta activada exitosamente.' };
+  }
+
   async requestPasswordReset(email: string) {
     const user = await this.findByEmail(email);
     if (!user) {
@@ -123,27 +124,21 @@ export class UsersService {
     }
 
     const resetToken = uuidv4();
+
     user.resetToken = resetToken;
     await this.usersRepository.save(user);
 
-    const baseUrl = this.configService.get<string>('BASE_URL');
+    const baseUrl = this.configService.get<string>('BASE_URL'); // Obtener BASE_URL del entorno
     const resetLink = `${baseUrl}/users/reset-password?token=${resetToken}`;
     await this.sendPasswordResetEmail(email, resetLink);
 
-    return {
-      message: 'Te hemos enviado un correo con un enlace para restablecer tu contraseña.',
-    };
+    return { message: 'Te hemos enviado un correo con un enlace para restablecer tu contraseña.' };
   }
 
   async resetPassword(token: string, newPassword: string) {
     const user = await this.usersRepository.findOne({ where: { resetToken: token } });
     if (!user) {
       throw new Error('Token de recuperación inválido o expirado.');
-    }
-
-    const isPasswordDifferent = await this.isPasswordDifferent(user, newPassword);
-    if (!isPasswordDifferent) {
-      throw new Error('La nueva contraseña no puede ser igual a la anterior.');
     }
 
     if (!this.validatePassword(newPassword)) {
@@ -157,35 +152,10 @@ export class UsersService {
     user.isLocked = false;
 
     await this.usersRepository.save(user);
+
     await this.sendPasswordResetSuccessEmail(user.email);
 
     return { message: 'Contraseña restablecida exitosamente.' };
-  }
-
-  // Método para verificar si la nueva contraseña es diferente a la actual
-  async isPasswordDifferent(user: User, newPassword: string): Promise<boolean> {
-    return !(await bcrypt.compare(newPassword, user.password));
-  }
-
-
-  async findByResetToken(token: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({ where: { resetToken: token } });
-  }
-
-  // Método para enviar un correo cuando la cuenta se ha bloqueado
-  private async sendAccountLockedEmail(email: string): Promise<void> {
-    const mailOptions = {
-      from: '"Cuenta Bloqueada" <axenoider20@gmail.com>',
-      to: email,
-      subject: 'Cuenta bloqueada',
-      html: `
-        <p>¡Hola!</p>
-        <p>Tu cuenta ha sido bloqueada tras varios intentos fallidos de inicio de sesión.</p>
-        <p>Por favor, restablece tu contraseña para poder acceder nuevamente.</p>
-      `,
-    };
-
-    await this.transporter.sendMail(mailOptions);
   }
 
   private async sendActivationEmail(email: string, activationLink: string) {
@@ -232,14 +202,23 @@ export class UsersService {
     await this.transporter.sendMail(mailOptions);
   }
 
-  private validateEmail(email: string): boolean {
-    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    return regex.test(email);
+  private async sendAccountLockedEmail(email: string) {
+    const mailOptions = {
+      from: '"Bloqueo de Cuenta" <axenoider20@gmail.com>',
+      to: email,
+      subject: 'Tu cuenta ha sido bloqueada',
+      html: `
+        <p>¡Hola!</p>
+        <p>Tu cuenta ha sido bloqueada tras múltiples intentos fallidos.</p>
+        <p>En iniciar sesión podrás recuperarla</p>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
   }
 
-  private validatePassword(password: string): boolean {
-    const regex = /^(?=.*[A-Z])(?=.*\d).+$/;
-    return regex.test(password);
+  private async findByEmail(email: string): Promise<User> {
+    return this.usersRepository.findOne({ where: { email } });
   }
 
   private async hashPassword(password: string): Promise<string> {
@@ -250,8 +229,14 @@ export class UsersService {
     return bcrypt.compare(password, hashedPassword);
   }
 
-  private async findByEmail(email: string): Promise<User> {
-    return this.usersRepository.findOne({ where: { email } });
+  private validateEmail(email: string): boolean {
+    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return regex.test(email);
+  }
+
+  private validatePassword(password: string): boolean {
+    const regex = /^(?=.*[A-Z])(?=.*\d).+$/;
+    return regex.test(password);
   }
 
   async isEmailAvailable(email: string): Promise<boolean> {
