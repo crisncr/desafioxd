@@ -133,11 +133,12 @@
       }
 
       // Regex para validación de contraseña
-      const passwordRegex = /^(?=.*[A-Z])(?=.*\d).+$/;
+      const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
       if (!passwordRegex.test(password)) {
-        alert('La contraseña debe contener al menos una letra mayúscula y un número.');
+        alert('La contraseña debe contener al menos una letra mayúscula, al menos un número, y un mínimo de 8 caracteres.');
         return false;
       }
+
 
       event.target.submit(); // Enviar el formulario si todo está bien
     }
